@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HCAY | Plan Verification Intake</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#16324c;background:#f3f7fa}
+*{box-sizing:border-box}main{max-width:790px;margin:32px auto;background:white;padding:30px;border-radius:18px;box-shadow:0 6px 30px #1233}
+h1{margin:0;font-size:1.65rem;color:#12577b}p{line-height:1.5}small,.hint{color:#526b7d}
+fieldset{border:1px solid #d2e1ea;border-radius:10px;margin:20px 0;padding:15px}legend{font-weight:700}
+.options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.options label{padding:11px;background:#f5f9fc;border-radius:9px;cursor:pointer}
+label.field{display:block;font-weight:650;margin:18px 0 7px}
+textarea,input{width:100%;padding:12px;border:1px solid #b5cad7;border-radius:9px;font:inherit}
+textarea{min-height:100px;resize:vertical}
+button{border:0;border-radius:9px;padding:12px 18px;font-weight:700;cursor:pointer;background:#12658b;color:white}
+button.secondary{background:#e4eef3;color:#164562}button:disabled{opacity:.55;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}
+#output{white-space:pre-wrap;min-height:180px;background:#f7fafc;font-size:.93rem}
+.note{border-left:3px solid #15759c;padding-left:12px}
+@media(max-width:600px){main{margin:0;padding:18px;border-radius:0}.options{grid-template-columns:1fr}}
+@media print{button,.actions{display:none}main{box-shadow:none}}
+</style></head><body><main>
+<h1>HCAY Plan Verification Intake</h1>
+<p>Prepare a consistent request for ChatGPT Work using a HealthSherpa plan-comparison PDF. This form <strong>does not send information, access accounts, or verify coverage</strong>.</p>
+<fieldset><legend>1. What should Work verify?</legend>
+<div class="options">
+<label><input type="radio" name="kind" value="meds"> Medications only</label>
+<label><input type="radio" name="kind" value="providers"> Doctors / hospitals only</label>
+<label><input type="radio" name="kind" value="both" checked> Both medications and providers</label>
+<label><input type="radio" name="kind" value="none"> No additional verification</label>
+</div></fieldset>
+<label class="field" for="year">2. Coverage year</label>
+<input id="year" type="number" min="2020" max="2100" value="2026">
+<p class="hint">Work must use the year and exact plan IDs from the attached PDF; flag any mismatch.</p>
+<section id="medSection">
+<label class="field" for="meds">3. Medications — one per line</label>
+<textarea id="meds" placeholder="Metformin ER 500 mg tablets&#10;Eliquis 5 mg tablets&#10;Ozempic 2 mg/3 mL pen, 0.25/0.5 mg dose"></textarea>
+<p class="hint">Include exact drug, strength and dosage form. Do not enter client identifiers.</p></section>
+<section id="providerSection">
+<label class="field" for="providers">4. Doctors / hospitals — one per line</label>
+<textarea id="providers" placeholder="Joshua Shane Knighton, MD — Family Medicine — 4525 Cameron Valley Parkway, Suite 4100-D, Charlotte, NC 28211"></textarea>
+<p class="hint">Include specialty and the specific office or facility address.</p></section>
+<label class="field" for="concerns">5. Additional concerns (optional)</label>
+<textarea id="concerns" placeholder="Example: Confirm the exact office location, not just the physician name."></textarea>
+<div class="actions"><button id="generate">Generate Work instructions</button><button id="copy" class="secondary" disabled>Copy instructions</button><button id="clear" class="secondary">Clear form</button></div>
+<label class="field" for="output">Instructions to paste into ChatGPT Work</label>
+<textarea id="output" readonly placeholder="Select your verification type, fill in the details, and click Generate."></textarea>
+<p id="status" role="status"></p>
+<p class="note"><strong>Privacy:</strong> This file works offline in your browser. It does not upload, transmit, or save entered information. Copy the instructions into a new Work chat within your HCAY project and attach the HealthSherpa comparison PDF separately. Avoid names, DOBs, member IDs and other client identifiers unless essential and appropriately protected.</p>
+</main><script>
+const $=id=>document.getElementById(id);
+function mode(){return document.querySelector('input[name="kind"]:checked').value}
+function update(){let m=mode();$('medSection').hidden=!(m==='meds'||m==='both');$('providerSection').hidden=!(m==='providers'||m==='both');$('copy').disabled=!$('output').value}
+document.querySelectorAll('input[name="kind"]').forEach(el=>el.addEventListener('change',update));
+$('generate').addEventListener('click',()=>{
+ const m=mode(), meds=$('meds').value.trim(),providers=$('providers').value.trim(),year=$('year').value.trim(), concerns=$('concerns').value.trim();
+ if((m==='meds'||m==='both')&&!meds){$('status').textContent='Please enter at least one medication.';return}
+ if((m==='providers'||m==='both')&&!providers){$('status').textContent='Please enter at least one doctor or hospital.';return}
+ if(!/^\d{4}$/.test(year)){$('status').textContent='Enter a four-digit coverage year.';return}
+ let lines=[
+ 'HCAY – ACA PLAN VERIFICATION REQUEST',
+ 'Use the attached HealthSherpa comparison PDF to identify the exact three plans, complete plan IDs/CSR variants, carrier networks, and coverage year.',
+ 'Requested coverage year: '+year+'. Never silently substitute another year, plan, network, location, or formulary. If the PDF differs from the requested year, flag the mismatch before proceeding.',
+ 'Verification type: '+({meds:'Medication only',providers:'Doctor/hospital only',both:'Combined medication and provider',none:'No additional verification'}[m])+'.'
+ ];
+ if(m==='meds'||m==='both')lines.push('MEDICATIONS:\n'+meds,'For each plan, independently establish the exact plan-to-formulary match using official carrier sources and the selected plan ID. Do not assume that plans from one carrier share a formulary or infer the match from tier counts. Check exact drug/strength/form, tier, PA, ST, QL and other restrictions. Give official links, document dates and page references. Do not infer copays from tier alone or assume therapeutic substitutions.');
+ if(m==='providers'||m==='both')lines.push('PROVIDERS / HOSPITALS:\n'+providers,'Use official carrier directories and check the exact physician/specialty, requested office address or facility, coverage year, network, and specific plan where selectable. A missing directory result is not proof of out-of-network status. Directory listing does not guarantee coverage for every service.');
+ if(m==='none')lines.push('Do not perform medication or provider research. Summarize the three quoted plans from the PDF only, with unresolved information clearly identified.');
+ if(concerns)lines.push('ADDITIONAL CONCERNS:\n'+concerns);
+ lines.push('Present a concise side-by-side report. Label each material finding Confirmed, Preliminary, or Unable to verify; distinguish official-source evidence from inference and explain unresolved items. Do not send messages, log into accounts, change records, or submit enrollment.');
+ $('output').value=lines.join('\n\n');$('copy').disabled=false;$('status').textContent='Instructions ready. Copy them and paste into Work with your PDF.';
+});
+$('copy').addEventListener('click',async()=>{
+ const val=$('output').value;
+ try{await navigator.clipboard.writeText(val);$('status').textContent='Copied. Paste into ChatGPT Work.'}
+ catch(e){$('output').focus();$('output').select();$('status').textContent='Select the instructions and press Ctrl+C to copy.'}
+});
+$('clear').addEventListener('click',()=>{
+ ['meds','providers','concerns','output'].forEach(id=>$(id).value='');
+ $('status').textContent='Form cleared.';update()
+});
+update();
+</script></body></html>
